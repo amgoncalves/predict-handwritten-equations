@@ -6,6 +6,10 @@ from __future__ import print_function
 Created on Tue Apr 25 17:06:17 2017
 
 @author: paulcabrera
+
+RUN:
+$ source ~/tensorflow/bin/activate
+$ python 5-4-17.py ./annotate/
 """
 
 """
