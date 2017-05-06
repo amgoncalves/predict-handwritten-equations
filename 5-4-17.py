@@ -508,7 +508,6 @@ identitybox = tf.identity(box)
 identityname = tf.identity(name)
 identitynum = tf.identity(n)
 
-saver = tf.train.Saver()
 
 sess.run(tf.global_variables_initializer())
 
@@ -519,7 +518,8 @@ for i in range(10000): # then try 20000
 												  x: batch[0], y_: batch[1], keep_prob: 1.0, name: batch[2]})
 		print('step %d, training accuracy %g'%(i, train_accuracy))
 	train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
-	
+
+saver = tf.train.Saver()
 save_path = saver.save(sess, 'my-model') 
 print ('Model saved in file: ', save_path) 
 
