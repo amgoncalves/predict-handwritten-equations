@@ -574,4 +574,5 @@ if __name__ == '__main__':
 
 	with open('predictions2.txt','w') as fout:
 		for res in results:
-			fout.write(str(res[0]+'\t\n'))
+			for r in res:
+				fout.write(r+'\t\n')
