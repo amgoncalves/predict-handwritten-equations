@@ -466,12 +466,7 @@ y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 #TRAIN & EVALUATE
 """
 
-cross_entropy = tf.reduce_mean(
-	 tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
-train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-prediction = tf.argmax(y_conv,1) 
 
-sess.run(tf.global_variables_initializer())
 """
 correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -484,11 +479,19 @@ identitynum = tf.identity(n)
 """
 
 # Define TensorFlow Session
-sess = tf.Session()
+#sess = tf.Session()
+
 
 # Import saved trained model
 tf.train.Saver().restore(sess, "./my-model")
 print("Model restored.")
+
+cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
+train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+prediction = tf.argmax(y_conv,1)
 
 """
 add whatever you think it's essential here
@@ -551,8 +554,8 @@ def predict(image_path):
 	comps = connectedcomps(scm.imread(image_path))
 	results =[]
 	for img in comps[0]:
-		img_transf = transform(img)
-		img_transf = np.transpose(img_transf.reshape(784,-1))
+		#img_transf = transform(img)
+		img_transf = np.transpose(img.reshape(784,-1))
 		img_prediction = prediction.eval(feed_dict={x: img_transf, keep_prob: 1.0}) 
 		res = file_name+'\t'+str(img_prediction[0])
 		results.append(res)
