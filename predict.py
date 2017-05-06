@@ -357,11 +357,14 @@ def oneHotTotal(lst):
 		arr = np.vstack((arr, oneHot(lst[i])))
 	return arr
 
+
+"""
 syims = addlabel(getsyims(trainpath)) # symbol (not equation) images; result is list of 3-element tuples: 
 (trainims, trainpaths, labels) = unpack(syims)
 labellst = list(set(labels)) 
 labellst.sort() # sorted list of unique labels
 onehotdict = oneHot(labellst)
+"""
 
 # uses variables defined outside of this function: trainims, trainpaths, labellst
 def my_next_batch(batch_size=10):
@@ -382,7 +385,7 @@ def my_next_batch(batch_size=10):
 	# randomly pick ten elements from trainims
 	size = len(trainims)
 	indices = [np.random.randint(0, size) for j in range(batch_size)]
-	numlabels = len(labellst)
+	numlabels = 40
 	batch_x = np.zeros((batch_size, 28*28))
 	batch_y = np.zeros((batch_size, numlabels)) # rows = batch_size and cols = # of unique symbols
 	batch_z = np.empty((batch_size, 1), dtype='<U150') # this is for image paths. row is for each image and column is 1 because it's just one string
@@ -411,7 +414,7 @@ def max_pool_2x2(x):
 sess = tf.InteractiveSession()
    
 x = tf.placeholder(tf.float32, shape=[None, 784])
-y_ = tf.placeholder(tf.float32, shape=[None, len(labellst)]) # len(label(lst)) is the number of unique labels
+y_ = tf.placeholder(tf.float32, shape=[None, 40]) # len(label(lst)) is the number of unique labels
 box = tf.placeholder(tf.int32, shape=[None, 4])
 name = tf.placeholder(tf.string, shape=[None, 1])
 n = tf.placeholder(tf.int32, shape=[None, 1])
@@ -454,25 +457,38 @@ h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 """
 #READOUT LAYER
 """
-W_fc2 = weight_variable([1024, len(labellst)])
-b_fc2 = bias_variable([len(labellst)])
+W_fc2 = weight_variable([1024, 40])
+b_fc2 = bias_variable([40])
 
 y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 	
 """
 #TRAIN & EVALUATE
 """
+
 cross_entropy = tf.reduce_mean(
 	 tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
 train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
 prediction = tf.argmax(y_conv,1) 
+
+sess.run(tf.global_variables_initializer())
+"""
 correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 identitybox = tf.identity(box)
 identityname = tf.identity(name)
 identitynum = tf.identity(n)
 
-sess.run(tf.global_variables_initializer())
+
+
+"""
+
+# Define TensorFlow Session
+sess = tf.Session()
+
+# Import saved trained model
+tf.train.Saver().restore(sess, "./my-model")
+print("Model restored.")
 
 """
 add whatever you think it's essential here
@@ -515,12 +531,7 @@ class ImgPred():
 			res += str(sym_pred) + '\n'
 		return res
 	
-# Define TensorFlow Session
-sess = tf.Session()
 
-# Import saved trained model
-tf.train.Saver().restore(sess, "./my-model")
-print("Model restored.")
 
 
 
@@ -534,10 +545,18 @@ def predict(image_path):
 	#Don't forget to store your prediction into ImgPred
 	img_prediction = ImgPred(...)
 	"""
-	img_transf = transform(scm.imread(image_path))
-	img_transf = np.transpose(img_transf.reshape(784,-1))
-	img_prediction = prediction.eval(feed_dict={x: img_transf, keep_prob: 1.0}) 
-	return img_prediction[0]
+	split_path  = image_path.split("/")
+	file_name = split_path[len(split_path)-1]
+
+	comps = connectedcomps(scm.imread(image_path))
+	results =[]
+	for img in comps[0]:
+		img_transf = transform(img)
+		img_transf = np.transpose(img_transf.reshape(784,-1))
+		img_prediction = prediction.eval(feed_dict={x: img_transf, keep_prob: 1.0}) 
+		res = file_name+'\t'+str(img_prediction[0])
+		results.append(res)
+	return results
 
 if __name__ == '__main__':
 	image_folder_path = argv[1]
@@ -553,6 +572,6 @@ if __name__ == '__main__':
 		impred = predict(image_path)
 		results.append(impred)
 
-	with open('predictions.txt','w') as fout:
+	with open('predictions2.txt','w') as fout:
 		for res in results:
-			fout.write(str(res))
+			fout.write(str(res[0]+'\t\n'))
