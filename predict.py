@@ -15,9 +15,21 @@ import numpy as np
 import skimage.morphology as morphology
 import tensorflow as tf
 
-trainpath = sys.argv[-1]  # # path for the folder containg the training images i.e. the path for 'annotated'
-# tf.reset_default_graph() # http://stackoverflow.com/questions/41400391/tensorflow-saving-and-resoring-session-multiple-variables
+tf.reset_default_graph() # http://stackoverflow.com/questions/41400391/tensorflow-saving-and-resoring-session-multiple-variables
+label_lst = ['(',')','+','-','0','1','2','3','4','6',
+             '=', 'A', 'a', 'b', 'bar', 'c', 'cos', 'd',
+             'delta', 'div', 'dots', 'f', 'frac', 'h', 'i', 'k',
+             'm', 'mul', 'n', 'o', 'p', 'pi', 'pm', 's', 'sin',
+             'sqrt', 't', 'tan', 'x', 'y'] # this corresponds to labellst that was created in the training script
 
+"""
+Potential issues leading to low accuracy:
+    1. Dimensions used for img_transf when reshaping
+    2. Model loading issues
+
+Comments:
+    1. Try on examples
+"""
 
 def padim(im):
 	""" Pads image to make it into a square.
@@ -366,36 +378,6 @@ labellst.sort() # sorted list of unique labels
 onehotdict = oneHot(labellst)
 """
 
-# uses variables defined outside of this function: trainims, trainpaths, labellst
-def my_next_batch(batch_size=10):
-	""" *** Description ***
-		
-	Parameters
-	----------
-	trainims : ** type **
-		*** Description of trainims ***
-	
-	Returns
-	-------
-	(array, array, array)
-		batch_x - numpy pixel arrays for each symbol
-		batch_y - one hot tensors for each symbol
-		batch_z - image path for the symbol's associate equation
-	"""
-	# randomly pick ten elements from trainims
-	size = len(trainims)
-	indices = [np.random.randint(0, size) for j in range(batch_size)]
-	numlabels = 40
-	batch_x = np.zeros((batch_size, 28*28))
-	batch_y = np.zeros((batch_size, numlabels)) # rows = batch_size and cols = # of unique symbols
-	batch_z = np.empty((batch_size, 1), dtype='<U150') # this is for image paths. row is for each image and column is 1 because it's just one string
-	for j in range(batch_size):
-		k = indices[j]
-		batch_x[j] = np.asarray(trainims[k]) 
-		batch_y[j] = np.asarray(onehotdict[labels[k]])
-		batch_z[j] = np.asarray(trainpaths[k])
-	return batch_x, batch_y, batch_z
-
 def weight_variable(shape):
 	  initial = tf.truncated_normal(shape, stddev=0.1)
 	  return tf.Variable(initial)
@@ -473,9 +455,6 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 identitybox = tf.identity(box)
 identityname = tf.identity(name)
 identitynum = tf.identity(n)
-
-
-
 """
 
 # Define TensorFlow Session
@@ -540,42 +519,45 @@ class ImgPred():
 
 def predict(image_path):
 	
-	"""
-	Add your code here
-	"""
+     """
+     Add your code here
+     """
 	
-	"""
-	#Don't forget to store your prediction into ImgPred
-	img_prediction = ImgPred(...)
-	"""
-	split_path  = image_path.split("/")
-	file_name = split_path[len(split_path)-1]
-
-	comps = connectedcomps(scm.imread(image_path))
-	results =[]
-	for img in comps[0]:
-		#img_transf = transform(img)
-		img_transf = np.transpose(img.reshape(784,-1))
-		img_prediction = prediction.eval(feed_dict={x: img_transf, keep_prob: 1.0}) 
-		res = file_name+'\t'+str(img_prediction[0])
-		results.append(res)
-	return results
+     """
+     #Don't forget to store your prediction into ImgPred
+     img_prediction = ImgPred(...)
+     """
+     #split_path  = image_path.split("/")
+     #file_name = split_path[len(split_path)-1]
+     (comps, bboxes) = connectedcomps(scm.imread(image_path))
+     numcomps = len(comps)
+     results =[]
+     i = 0
+     for i in range(numcomps):
+         img, box = comps[i], bboxes[i]
+         img_transf = np.transpose(img.reshape(784,-1))
+         img_prediction = prediction.eval(feed_dict={x: img_transf, keep_prob: 1.0}) 
+         results.append((img_prediction, box, getlocalpath(image_path), numcomps))
+     return results
 
 if __name__ == '__main__':
-	image_folder_path = argv[1]
-	isWindows_flag = False
-	if len(argv) == 3:
-		isWindows_flag = True
-	if isWindows_flag:
-		image_paths = glob(image_folder_path + '\\*png')
-	else:
-		image_paths = glob(image_folder_path + '/*png')
-	results = []
-	for image_path in image_paths:
-		impred = predict(image_path)
-		results.append(impred)
-
-	with open('predictions2.txt','w') as fout:
-		for res in results:
-			for r in res:
-				fout.write(r+'\t\n')
+    image_folder_path = argv[1]
+    isWindows_flag = False
+    if len(argv) == 3:
+        isWindows_flag = True
+    if isWindows_flag:
+        image_paths = glob(image_folder_path + '\\*png')
+    else:
+        image_paths = glob(image_folder_path + '/*png')
+    results = []
+    for image_path in image_paths:
+        impred = predict(image_path)
+        results.append(impred)
+    with open('predictions3.txt','w') as fout:
+        for eqres in results: # results for a particular equation
+            fout.write(eqres[0][2] + '\t' + str(eqres[0][3]) + '\t\n') # project specifies extra tab at end
+            for comp in eqres:
+                pred, bbox = comp[0], comp[1]
+                #fout.write(r+'\t\n')
+                fout.write(str(SymPred(label_lst[pred[0]], bbox[1], bbox[0], bbox[3], bbox[2])) + '\n')
+                
