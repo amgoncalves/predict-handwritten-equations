@@ -16,42 +16,28 @@ $ python 5-4-17.py ./annotate/
 To-do's:
     1. Remove every 10th in the get_train_data3() fn
 """
+
 """
 Comments:
     1. Consider changing imrows and imcols to 32, 32. Unable to do so without an error.
     2. Consider using TA's input wrapper instead of padim and fullpadim
     3. How does it work without dilation? How about Sharpen (didn't work last time however)?
     4. MNIST
-        - perhaps reduce chance of using mnist by dividing by larger number e.g. 4, 5
-    5. http://www.ee.surrey.ac.uk/CVSSP/demos/chars74k/. I think just the letters for now, because I have so many digits.
-        - Yeah, don't do the image_deformation and saving image method for traindata2. Simply making the chance of using
-        MNIST less likely is enough to push up proportion of traindata2 used. 
-        - increase batch size again? 45?
+    5. http://www.ee.surrey.ac.uk/CVSSP/demos/chars74k/.
         - consider cropping
     6. Kaggle. Try adding it to the data. And then consider trying to use it on its own. When doing the latter, 
     just use all the labellst symbols instead of just math symbols.
     ##### CHANGE invert_flag to False once you've inverted images #####
-    6. remove sin, cos, tan from labellst and training ims?
-    7. remove padding from training data?
-    7. reduce the size of the weight variable from [5, 5, ...] to [3, 3, ...]
-    7. Since we only need to identify individual characters, not cos or sin, should we remove these labels?
-    7. More complex NN. Could the batch norm part have thrown off the complex NN results during my prior attempt?
-    8. Consider batch normalization again since we're using a more complex NN.
-    9. Improve partitioning of components:
+    7. remove sin, cos, tan from labellst and training ims?
+    8. remove padding from training data?
+    9. reduce the size of the weight variable from [5, 5, ...] to [3, 3, ...]
+    10. More complex NN. Could the batch norm part have thrown off the complex NN results during my prior attempt?
+    11. Consider batch normalization again since we're using a more complex NN.
+    12. Improve partitioning of components:
     e.g. SKMBT_36317040717260_eq12.png - only 6 components for some reason? Does this has to do with comps[i].area < 50 in connectedcomps?
     e.g. SKMBT_36317040717260_eq3.png - Only 2 rather than 3 comps. It looks like the 3 is not being counted as a component. Perhaps 
     I need to decrease the threshold area, or normalize the images in some way so that I can have a threshold that can be justified 
     to apply to all images.
-    10. Increase number of math symbols somehow. Currently, there's a lot of MNIST data. I could create a separate data set
-    of symbols from training images given to us of image_deformation applied to them several times to the point where we have
-    a proportional number of trianing images for each of the 40 symbols in label_lst i.e. 1/40 chance.
-    I could also just read the images from the folder testdata2, deform and save those images, and then just read images
-    from there next_batch and not apply image_deform since I already have deformed images
-    
-    An alternate way is simply to figure out how to increase the likelihood that a symbol that's not a digit or letter
-    is picked. I could for example have a function that returns a value between 0 and 1. You cut this interval
-    into 40 intervals and depending on the value, you get an image for particular symbol. 
-    Depending on the interval, you'd also have to figure out which dataset to draw from: trainims, trainims2, MNIST
 """
 import sys
 from tensorflow.examples.tutorials.mnist import input_data 
@@ -673,7 +659,7 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 sess.run(tf.global_variables_initializer())
 
 for i in range(10000): # then try 20000
-    batch = my_next_batch(40)
+    batch = my_next_batch(50)
     if i%100 == 0:
         train_accuracy = accuracy.eval(feed_dict={
                                                   x: batch[0], y_: batch[1], keep_prob: 1.0})
