@@ -15,12 +15,27 @@ import numpy as np
 import skimage.morphology as morphology
 import tensorflow as tf
 
+"""
+Comments:
+"""
+
 tf.reset_default_graph() # http://stackoverflow.com/questions/41400391/tensorflow-saving-and-resoring-session-multiple-variables
+"""
 label_lst = ['(',')','+','-','0','1','2','3','4','6',
              '=', 'A', 'a', 'b', 'bar', 'c', 'cos', 'd',
              'delta', 'div', 'dots', 'f', 'frac', 'h', 'i', 'k',
              'm', 'mul', 'n', 'o', 'p', 'pi', 'pm', 's', 'sin',
              'sqrt', 't', 'tan', 'x', 'y'] # this corresponds to labellst that was created in the training script
+"""
+label_lst = ['(',')','+','-','0','1','2','3','4','6',
+             '=', 'A', 'a', 'b', 'bar', 'c', 'd',
+             'delta', 'div', 'dots', 'f', 'frac', 'h', 'i', 'k',
+             'm', 'mul', 'n', 'o', 'p', 'pi', 'pm', 's',
+             'sqrt', 't', 'x', 'y'] # this corresponds to labellst that was created in the training script
+label_lst.sort()             
+imrows = 28
+imcols = 28
+imshape = (4000, 4000)      
 
 """
 Potential issues leading to low accuracy:
@@ -106,22 +121,24 @@ def cropim(im):
 	return np.array(im.getdata()).reshape((im.size[1], im.size[0])) # confirmed it's im.size[1] and im.size[0] in that order
 	
 def normalize(im):
-	""" Normalize ndarray to values between 0 and 1
+    """ Normalize ndarray to values between 0 and 1
 	
-	Parameters
-	----------
-	img : ndarray
-		Image data to be normalized.
+    Parameters
+    ----------
+    img : ndarray
+    Image data to be normalized.
 		
-	Returns
-	-------
-	ndarray
-		A normalized copy of im.
-	"""
-	return im / im.max() # MNIST data says 0 means white and 255 means black. MNIST images are normalized between 0 and 1. 
+    Returns
+    -------
+    ndarray
+    A normalized copy of im.
+    """
+    if im.max() > 1:
+        return im/im.max() # MNIST data says 0 means white and 255 means black. MNIST images are normalized between 0 and 1. 
+    return im
 	
 def newim(im):
-	""" Returns a normalized and padded square 28x28 pixel copy of an equation component.
+	""" Returns a normalized and padded square imrowsximcols pixel copy of an equation component.
 	
 	Parameters
 	----------
@@ -158,10 +175,10 @@ def connectedcomps(im):
 		if comps[i].area < 50:
 			continue
 		bbcoords += [comps[i].bbox]
-		newcomps += [normalize(morphology.dilation(
+		newcomps += [normalize(
 							  scm.imresize(
 									fullpadim(cropim(np.asarray(comps[i].image, dtype=np.float32))), 
-									(28, 28), 'bicubic')))]
+									(imrows, imcols), 'bicubic'))]
 	return (newcomps, bbcoords)	 
 
 def getlocalpath(path):
@@ -261,13 +278,13 @@ def geteqpaths(folder):
 	return list(d.keys())
 
 def transform(im):
-	return normalize(np.reshape(morphology.dilation(scm.imresize(fullpadim(im), (28, 28), 'bicubic')), 28*28))
+	return normalize(np.reshape(morphology.dilation(scm.imresize(fullpadim(im), (imrows, imcols), 'bicubic')), imrows*imcols))
 
 def geteqims(folder):
 	return [(scm.imread(impath), impath) for impath in geteqpaths(folder)]
 		 
 # Get the images of the symbols. These will be used as training data
-# list of tuples: (ndarray length 28*28 of image, imagepath)
+# list of tuples: (ndarray length imrows*imcols of image, imagepath)
 def getsyims(folder):
 	return [(transform(scm.imread(impath)), impath) for impath in getsypaths(folder)]
 			
@@ -395,8 +412,8 @@ def max_pool_2x2(x):
 	  
 sess = tf.InteractiveSession()
    
-x = tf.placeholder(tf.float32, shape=[None, 784])
-y_ = tf.placeholder(tf.float32, shape=[None, 40]) # len(label(lst)) is the number of unique labels
+x = tf.placeholder(tf.float32, shape=[None, imrows*imcols])
+y_ = tf.placeholder(tf.float32, shape=[None, len(label_lst)]) # len(label_lst)) is the number of unique labels
 box = tf.placeholder(tf.int32, shape=[None, 4])
 name = tf.placeholder(tf.string, shape=[None, 1])
 n = tf.placeholder(tf.int32, shape=[None, 1])
@@ -407,7 +424,7 @@ n = tf.placeholder(tf.int32, shape=[None, 1])
 W_conv1 = weight_variable([5, 5, 1, 32])
 b_conv1 = bias_variable([32])
 
-x_image = tf.reshape(x, [-1,28,28,1]) 
+x_image = tf.reshape(x, [-1,imrows,imcols,1]) 
 
 h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1) 
 h_pool1 = max_pool_2x2(h_conv1) 
@@ -439,8 +456,8 @@ h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 """
 #READOUT LAYER
 """
-W_fc2 = weight_variable([1024, 40])
-b_fc2 = bias_variable([40])
+W_fc2 = weight_variable([1024, len(label_lst)])
+b_fc2 = bias_variable([len(label_lst)])
 
 y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 	
@@ -535,7 +552,7 @@ def predict(image_path):
      i = 0
      for i in range(numcomps):
          img, box = comps[i], bboxes[i]
-         img_transf = np.transpose(img.reshape(784,-1))
+         img_transf = np.transpose(img.reshape(imrows*imcols,-1))
          img_prediction = prediction.eval(feed_dict={x: img_transf, keep_prob: 1.0}) 
          results.append((img_prediction, box, getlocalpath(image_path), numcomps))
      return results
@@ -553,7 +570,7 @@ if __name__ == '__main__':
     for image_path in image_paths:
         impred = predict(image_path)
         results.append(impred)
-    with open('predictions3.txt','w') as fout:
+    with open('predictions.txt','w') as fout:
         for eqres in results: # results for a particular equation
             fout.write(eqres[0][2] + '\t' + str(eqres[0][3]) + '\t\n') # project specifies extra tab at end
             for comp in eqres:
