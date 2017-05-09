@@ -61,33 +61,6 @@ Out[95]:
  198]
 sum(b)
 Out[96]: 18349
-Comments:
-    1. Consider changing imrows and imcols to 32, 32. Unable to do so without an error.
-    2. remove cos and sin and tan. use some sort of if statement checking for any of these symbol images
-    and skipping them in getsypaths fn. also don't include them from testdata3. Then use more of the Kaggle data
-    and see if I can get all the symbols in label_lst from kaggle. Don't use MNIST. And then later try adding
-    MNIST back. 
-    # Before removing sin, cos, tan trainims was 3480 and trainims3 (every 10th) was 8784
-    # after removing it's 3452 and trainims is 3784 and label_lst length is 37
-    # Look at traindata3 and see if I need to add more symbols and invert more too.
-    # Removed MNIST. I think there are too many numbers leading to too many digit predictions for non-digit characters
-    2. Consider using TA's input wrapper instead of padim and fullpadim
-    3. How does it work without dilation? How about Sharpen (didn't work last time however)?
-    4. Consider using just Kaggle.
-    it only has symbols for -, not bar and frac. Perhaps just randomly assign -, bar, and frac to the images in -. 
-    5. http://www.ee.surrey.ac.uk/CVSSP/demos/chars74k/.
-        - consider cropping
-    ##### CHANGE invert_flag to False once you've inverted images #####
-    8. remove padding from training data? remove transformation from testdata3?
-    9. reduce the size of the weight variable from [5, 5, ...] to [3, 3, ...]
-    10. More complex NN. Could the batch norm part have thrown off the complex NN results during my prior attempt?
-    11. Consider batch normalization again since we're using a more complex NN.
-    12. Improve partitioning of components:
-    e.g. SKMBT_36317040717260_eq12.png - only 6 components for some reason? Does this has to do with comps[i].area < 50 in connectedcomps?
-    e.g. SKMBT_36317040717260_eq3.png - Only 2 rather than 3 comps. It looks like the 3 is not being counted as a component. Perhaps 
-    I need to decrease the threshold area, or normalize the images in some way so that I can have a threshold that can be justified 
-    to apply to all images.
-    13. consider removing image deformation
 """
 import sys
 from tensorflow.examples.tutorials.mnist import input_data 
