@@ -14,22 +14,71 @@ $ python 5-4-17.py ./annotate/
 
 """
 To-do's:
-    1. Remove every 10th in the get_train_data3() fn
+    1. Remove every 5th in the get train 3 fn
+    
 """
 
 """
+trainims: 3,452, trainims3: 18,349 (every 5th), fulltrainims: 21,801
+a = [[e == labels3[i] for i in range(len(labels3))] for e in symbols]
+b = [sum(lst) for lst in a]
+b
+Out[95]: 
+[930,                 
+ 929,
+ 1642,
+ 2251,
+ 848,
+ 7,
+ 44,
+ 31,
+ 182,
+ 125,
+ 41,
+ 494,
+ 68,
+ 590,
+ 464,
+ 310,
+ 262,
+ 193,
+ 74,
+ 281,
+ 157,
+ 133,
+ 579,
+ 23,
+ 136,
+ 71,
+ 172,
+ 1538,
+ 517,
+ 445,
+ 1730,
+ 1715,
+ 702,
+ 467,
+ 198]
+sum(b)
+Out[96]: 18349
 Comments:
     1. Consider changing imrows and imcols to 32, 32. Unable to do so without an error.
+    2. remove cos and sin and tan. use some sort of if statement checking for any of these symbol images
+    and skipping them in getsypaths fn. also don't include them from testdata3. Then use more of the Kaggle data
+    and see if I can get all the symbols in label_lst from kaggle. Don't use MNIST. And then later try adding
+    MNIST back. 
+    # Before removing sin, cos, tan trainims was 3480 and trainims3 (every 10th) was 8784
+    # after removing it's 3452 and trainims is 3784 and label_lst length is 37
+    # Look at traindata3 and see if I need to add more symbols and invert more too.
+    # Removed MNIST. I think there are too many numbers leading to too many digit predictions for non-digit characters
     2. Consider using TA's input wrapper instead of padim and fullpadim
     3. How does it work without dilation? How about Sharpen (didn't work last time however)?
-    4. MNIST
+    4. Consider using just Kaggle.
+    it only has symbols for -, not bar and frac. Perhaps just randomly assign -, bar, and frac to the images in -. 
     5. http://www.ee.surrey.ac.uk/CVSSP/demos/chars74k/.
         - consider cropping
-    6. Kaggle. Try adding it to the data. And then consider trying to use it on its own. When doing the latter, 
-    just use all the labellst symbols instead of just math symbols.
     ##### CHANGE invert_flag to False once you've inverted images #####
-    7. remove sin, cos, tan from labellst and training ims?
-    8. remove padding from training data?
+    8. remove padding from training data? remove transformation from testdata3?
     9. reduce the size of the weight variable from [5, 5, ...] to [3, 3, ...]
     10. More complex NN. Could the batch norm part have thrown off the complex NN results during my prior attempt?
     11. Consider batch normalization again since we're using a more complex NN.
@@ -38,6 +87,7 @@ Comments:
     e.g. SKMBT_36317040717260_eq3.png - Only 2 rather than 3 comps. It looks like the 3 is not being counted as a component. Perhaps 
     I need to decrease the threshold area, or normalize the images in some way so that I can have a threshold that can be justified 
     to apply to all images.
+    13. consider removing image deformation
 """
 import sys
 from tensorflow.examples.tutorials.mnist import input_data 
@@ -161,19 +211,21 @@ def cropim(im):
 	return np.array(im.getdata()).reshape((im.size[1], im.size[0])) # confirmed it's im.size[1] and im.size[0] in that order
 	
 def normalize(im):
-	""" Normalize ndarray to values between 0 and 1
+    """ Normalize ndarray to values between 0 and 1
 	
-	Parameters
-	----------
-	img : ndarray
-		Image data to be normalized.
+    Parameters
+    ----------
+    img : ndarray
+    Image data to be normalized.
 		
-	Returns
-	-------
-	ndarray
-		A normalized copy of im.
-	"""
-	return im / im.max() # MNIST data says 0 means white and 255 means black. MNIST images are normalized between 0 and 1. 
+    Returns
+    -------
+    ndarray
+    A normalized copy of im.
+    """
+    if im.max() > 1: # only divide by .max() if it's greater than 1 meaning data needs to be normalized.
+        return im/im.max() # MNIST data says 0 means white and 255 means black. MNIST images are normalized between 0 and 1. 
+    return im
 
 def getlocalpath(path):
 	""" Returns the last value of a filepath.
@@ -259,13 +311,16 @@ def getdict(folder):
 	return d
 	
 def getsypaths(folder):
-	d = getdict(folder)
-	lst = list(d.values())
-	sypaths = []
-	for e in lst:
-		if e:	# not the empty list
-			sypaths += e
-	return sypaths
+    d = getdict(folder)
+    lst = list(d.values())
+    sypaths = []
+    for e in lst:
+        if e:	# not the empty list
+            for impath in e:
+                label = getlabel(impath)
+                if label not in ('cos', 'sin', 'tan'):
+                    sypaths += [impath]
+    return sypaths
 
 def geteqpaths(folder):
 	d = getdict(folder)
@@ -280,6 +335,10 @@ def transform(im):
 # Removed np.reshape
 def transform(im):
 	return normalize(morphology.dilation(scm.imresize(fullpadim(im), (imrows, imcols), 'bicubic')))
+ 
+# Alternate way of dealing with training data: don't pad or dilate. Leads to very inaccurate results.
+def transform2(im):
+	return normalize(scm.imresize(im, (imrows, imcols), 'bicubic'))
  
 def geteqims(folder):
 	return [(scm.imread(impath), impath) for impath in geteqpaths(folder)]
@@ -372,24 +431,35 @@ def get_train_data2(): # size 935 data set
   
 """
 
-trainfolders3 = glob.glob(trainpath3+'/*')
+folders3 = glob.glob(trainpath3+'/*')
 # These are math symbols that I've confirmed there are folders for in the Kaggle data set.
 # Not all the math symbols e.g. frac are here. Also not that div in data also includes / 
-mathsymbols= ['(',')','+','-', '=', 'cos', 'delta', 'div', 
-                  'dots', 'mul', 'pi', 'pm', 'sin', 'sqrt', 'tan'] # size 127,361 data set                 
+#mathsymbols= ['(',')','+','-', '=', 'cos', 'delta', 'div', 
+#                  'dots', 'mul', 'pi', 'pm', 'sin', 'sqrt', 'tan'] # size 127,361 data set   
+mathsymbols= ['(',')','+','-', '=', 'delta', 'div', 
+                  'dots', 'mul', 'pi', 'pm', 'sqrt'] # size 127,361 data set                   
 letters = ['A', 'a', 'b', 'c', 'd', 'f', 'h', 'i', 'k',
            'm', 'n', 'o', 'p', 's', 't', 'x', 'y']
-numbers = ['0', '1', '2', '3', '4', '6']
-symbols = mathsymbols + letters + numbers # omitting numbers for now and just using MNIST
+numbers = ['0', '1', '2', '3', '4', '6'] 
+symbols = mathsymbols + letters + numbers # doesn't include bar and frac; seems like I've inverted all images
 ### Letters: uppercase and lowercase have to be separated in the folders since they're all mixed together
 ### the issue is that some file names have e.g. a____, A____, exp____ so the exp____ ones have to be deleted/filtered out
 
+trainfolders3 = []
+for f in folders3:
+    localpath = getlocalpath(f)
+    if localpath.lower() in symbols or localpath.upper() in symbols:
+        trainfolders3 += [f]
+
                     # remove cos, sin, tan?
-trainfolders3 = [f for f in trainfolders3 if getlocalpath(f) in symbols]
+#trainfolders3 = [f for f in folders3 if 
+ #                (getlocalpath(f).lower() in symbols or getlocalpath(f).upper() in symbols)]
 # If I decide to just use all the symbols from the data set then just start from scratch and use label_lst as valid_folders3
 # Just make sure the symbols match the folder names. Could also just use the symbols in valid_folders3_extra since I already
 # have MNIST data. It depends, but I think due to the size of the data set
 
+### trainfolders3 is still missing = for some reason
+### I'M GOING TO HAVE TO INVERT STUFF AGAIN 'CAUSE MY TRAINFOLDERS3 IS WRONG ###
 def invert_train_data3():
     for f in trainfolders3:
         impaths = glob.glob(f+'/*.jpg')
@@ -403,19 +473,25 @@ def get_train_data3():
     for f in trainfolders3:
         label = getlocalpath(f)
         impaths = glob.glob(f+'/*.png')
-        #i = 0
+        i = 0
         for path in impaths:
             localpath = getlocalpath(path)
-            localpath = getlocalpath(path)[0:(len(localpath)-4)] # remove .png
-            if localpath[0] == 'e': # can't determine if upper or lower case
+            # if localpath[0] == 'e', can't determine if upper or lower case for letters for exp___.png files
+            # So that we have similar number of symbols for each one, continue even for symbols that aren't letter.
+            if localpath[0] == 'e':
                 continue
-            if localpath in letters:
-                label = localpath                
-            if i%10 == 0: # EVERY 10th for now.
+            localpath = localpath[0:(len(localpath)-4)] # remove .png
+            #if (label.lower() in letters or label.upper() in letters) and localpath[0] in letters:
+                #label = localpath[0] 
+            if (label.lower() in letters or label.upper() in letters) and localpath[0] in letters:
+                label = localpath[0]
+            #if i%5 == 0: # EVERY 5th for now. 
+            if label in symbols:
                 ims.append(transform(scm.imread(path)))
                 labels.append(label)
             #ims.append(transform(scm.imread(path))) 
             #labels.append(label)
+            i += 1
     return (ims, labels)
     
 # args: lst - sorted list of unique labels e.g. label_lst = list(set(labels)).sorted()
@@ -524,6 +600,7 @@ so that my_next_batch calls it randomly when needing to build a batch size of 25
 mnist.train.images is a [55000, 784] tensor.
 
 """
+
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 def next_mnist_batch(batch_size=1):
     is_valid_digit = lambda onehot: any((onehot[0], onehot[1], onehot[2], 
@@ -533,8 +610,7 @@ def next_mnist_batch(batch_size=1):
         mnist_batch = mnist.train.next_batch(1)
         if is_valid_digit(mnist_batch[1][0]):
             batch.append(mnist_batch)
-    return batch
-        
+    return batch 
 
 # uses variables defined outside of this function: trainims, label_lst
 def my_next_batch(batch_size=10):
@@ -554,7 +630,8 @@ def my_next_batch(batch_size=10):
     """
     # randomly pick batch_size number of elements from trainims
     n = len(full_trainims)
-    train_size = n + 6*55000//10 #  3480 + ... + 33000
+    #train_size = n + 6*55000//10 #  3480 + ... + 33000
+    train_size = n
     # MNIST has 55,000 training images. Assume 5,500 images for each digits.
     indices = [np.random.randint(0, train_size) for j in range(batch_size)]
     numlabels = len(label_lst)
@@ -562,11 +639,11 @@ def my_next_batch(batch_size=10):
     batch_y = np.zeros((batch_size, numlabels)) # rows = batch_size and cols = # of unique symbols
     for j in range(batch_size):
         k = indices[j]
-        #print(j)
         if k < n:
             batch_x[j] = np.asarray(np.reshape(image_deformation(full_trainims[k]), imrows*imcols))
             batch_y[j] = np.asarray(onehotdict[full_labels[k]])
-        else:
+        else: # currently not being called
+            print('MNIST')
             mnist_batch = next_mnist_batch()[0]
             imdata = mnist_batch[0][0]
             if imrows != 28 or imcols != 28:
@@ -658,8 +735,8 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 sess.run(tf.global_variables_initializer())
 
-for i in range(10000): # then try 20000
-    batch = my_next_batch(50)
+for i in range(20000): # then try 15000
+    batch = my_next_batch(20)
     if i%100 == 0:
         train_accuracy = accuracy.eval(feed_dict={
                                                   x: batch[0], y_: batch[1], keep_prob: 1.0})
