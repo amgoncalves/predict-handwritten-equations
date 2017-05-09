@@ -17,6 +17,8 @@ import tensorflow as tf
 
 """
 Comments:
+    Debugging - I made sure that the one hot tensors have the 1 in the right place given label_lst in predict.py
+    [onehotdict[sym].index(1) for sym in label_lst] shows that the one hot tensors are correct.
 """
 
 tf.reset_default_graph() # http://stackoverflow.com/questions/41400391/tensorflow-saving-and-resoring-session-multiple-variables
@@ -35,16 +37,8 @@ label_lst = ['(',')','+','-','0','1','2','3','4','6',
 label_lst.sort()             
 imrows = 28
 imcols = 28
-imshape = (4000, 4000)      
+#imshape = (4000, 4000)      
 
-"""
-Potential issues leading to low accuracy:
-    1. Dimensions used for img_transf when reshaping
-    2. Model loading issues
-
-Comments:
-    1. Try on examples
-"""
 
 def padim(im):
 	""" Pads image to make it into a square.
@@ -136,22 +130,6 @@ def normalize(im):
     if im.max() > 1:
         return im/im.max() # MNIST data says 0 means white and 255 means black. MNIST images are normalized between 0 and 1. 
     return im
-	
-def newim(im):
-	""" Returns a normalized and padded square imrowsximcols pixel copy of an equation component.
-	
-	Parameters
-	----------
-	im : ndarray
-		Image data.
-	
-	Returns
-	-------
-	ndarray
-		A normalized, padded, square copy of im.
-	
-	"""
-	return normalize(fullpadim(im))
 
 def connectedcomps(im):
 	""" Returns a list of connected components as ndarrays that have more than 50 pixels
@@ -175,10 +153,10 @@ def connectedcomps(im):
 		if comps[i].area < 50:
 			continue
 		bbcoords += [comps[i].bbox]
-		newcomps += [normalize(
+		newcomps += [normalize(morphology.dilation(
 							  scm.imresize(
 									fullpadim(cropim(np.asarray(comps[i].image, dtype=np.float32))), 
-									(imrows, imcols), 'bicubic'))]
+									(imrows, imcols), 'bicubic')))]
 	return (newcomps, bbcoords)	 
 
 def getlocalpath(path):
@@ -194,206 +172,10 @@ def getlocalpath(path):
 	string
 		The containing directory of path.
 	"""
-	return path.split('/')[-1]
-
-def geteqnpath(path):
-	""" Given the full path for a symbol, return the path of the corresponding equation.
-	
-	Parameters
-	----------
-	path : string
-		A complete image component file path. Ex: '$home/annotated/SKMBT_36317040717260_eq2_sqrt_22_98_678_797.png'
-		
-	Returns
-	-------
-	string
-		Path of the corresponding equation image.  Ex: '$home/annotated/SKMBT_36317040717260_eq2.png'		
-	"""
-	s = ""
-	count = 0 # keeps track of number of underscores encountered
-	for c in path:
-		if c == '_':
-			count += 1
-		if count == 3:
-			break
-		s += c
-	if '.png' in s:
-		return s
-	return s + '.png'
-		
-
-def getdict(folder):
-	""" Returns a dictionary where the key is the equation image path and the value is a list of paths for the symbols of the equation.
-	
-	Parameters
-	----------
-	folder : string
-		The full path of the folder containing the annotated images.
-	
-	Returns
-	-------
-	dict(string, list(string))
-		A dictionary of image paths keys and component path list values.
-	"""
-	paths = glob(folder+'/*.png')
-	eqns = {}
-	d = {}
-	iseqn = False
-	i = -5
-	s = ''
-	for p in paths:
-		c = p[i] # p[-5], which is the character right before the .png
-		# use this loop to see if 'eq' occurs before the first instance of '_' when going in reverse order
-		while c != '_' and (not iseqn) and abs(i) <= len(p): 
-			s += c
-			if 'eq' in s[::-1]: # reverse of s since s is being built up in reverse
-				iseqn = True
-			i -= 1
-			if abs(i) <= len(p):
-				c = p[i]
-		if iseqn: 
-			eqns[p] = []
-		else: # path is for an image of a symbol, not equation
-			eqnpath = geteqnpath(p)
-			if eqnpath in eqns: # otherwise: FileNotFoundError
-				if eqnpath not in d:
-					d[eqnpath] = []
-				d[eqnpath] += [p]
-		s = ''
-		iseqn = False
-		i = -5
-	return d
-	
-def getsypaths(folder):
-	d = getdict(folder)
-	lst = list(d.values())
-	sypaths = []
-	for e in lst:
-		if e:	# not the empty list
-			sypaths += e
-	return sypaths
-
-def geteqpaths(folder):
-	d = getdict(folder)
-	return list(d.keys())
+	return path.split('/')[-1]		
 
 def transform(im):
 	return normalize(np.reshape(morphology.dilation(scm.imresize(fullpadim(im), (imrows, imcols), 'bicubic')), imrows*imcols))
-
-def geteqims(folder):
-	return [(scm.imread(impath), impath) for impath in geteqpaths(folder)]
-		 
-# Get the images of the symbols. These will be used as training data
-# list of tuples: (ndarray length imrows*imcols of image, imagepath)
-def getsyims(folder):
-	return [(transform(scm.imread(impath)), impath) for impath in getsypaths(folder)]
-			
-# given the path for a symbol in the format of images in annotated, extract the label
-def getlabel(path):
-	# once you get to the 4th underscore as you move backwards through the path, build the string until you reach the 5th underscore
-	count = 0 # count of underscores
-	label = ''
-	i = -1
-	while count < 5 and abs(i) <= len(path):
-		if path[i] == '_':
-			count += 1
-		elif count == 4: # assuming '_' is not a valid symbol
-			label += path[i]
-		i -= 1
-	return label[::-1] # reverse
-	
-# Add the corresponding label to each tuple for the argument trainims, which is the result of getsyims(trainpath)
-def addlabel(trainims):
-	""" Add the corresponding label to each tuple for the argument trainims, which is the result of getsyims(trainpath).
-	
-	Parameters
-	----------
-	trainims : *** type ***
-		*** Description of trainims ***
-	
-	Returns
-	-------
-	*** return type ***
-		*** Description of return type ***
-	"""
-	return [(im, impath, getlabel(impath)) for (im, impath) in trainims]
-	
-def unpack(syims):
-	""" *** Description here ***
-	
-	Parameters
-	----------
-	syims : ** type **
-		** Description here. **
-	
-	Returns
-	-------
-	(array.**type**, array.**type**, array.**type**)
-		ims - 
-		paths -
-		labels -
-	"""
-	ims, paths, labels = [], [], []
-	for e in syims:
-		ims += [e[0]]
-		paths += [e[1]]
-		labels += [e[2]]
-	#return (np.asarray(ims), np.asarray(paths), np.asarray(labels)) # currently seems unnecessary based on what I'm doing in my_next_batch
-	return (ims, paths, labels)		   
-
-# args: lst - sorted list of unique labels e.g. labellst = list(set(labels)).sorted()
-# returns dictionary of onehot lists for each label
-def oneHot(lst):
-	""" *** Description ***
-	
-	Parameters
-	----------
-	lst : list
-		Sorted list of unique labels. e.g. labellst = list(set(labels)).sorted()
-		
-	Returns
-	-------
-	dict.***type***
-		Dictionary of onehot lists for each label.
-	"""
-	d = {}	
-	n = len(lst)
-	onehotlst = [0]*n # list of zeros of length len(lst)
-	i = 0
-	for label in lst:
-		onehotlst[i] = 1
-		d[label] = onehotlst
-		onehotlst = [0]*n
-		i += 1
-	return d
-	
-# return an ndarray of one-hot lists for every element. INCOMPLETE
-def oneHotTotal(lst):
-	""" Return an ndarray of one-hot lists for every element. INCOMPLETE
-	
-	Parameters
-	----------
-	lst : list
-		List of component labels.
-	
-	Returns
-	-------
-	array.list.
-		Array of one-hot lists.
-	"""
-	arr = np.asarray(oneHot(lst[0]))
-	for i in range(1, len(lst)):
-		arr = np.vstack((arr, oneHot(lst[i])))
-	return arr
-
-
-"""
-syims = addlabel(getsyims(trainpath)) # symbol (not equation) images; result is list of 3-element tuples: 
-(trainims, trainpaths, labels) = unpack(syims)
-labellst = list(set(labels)) 
-labellst.sort() # sorted list of unique labels
-onehotdict = oneHot(labellst)
-"""
 
 def weight_variable(shape):
 	  initial = tf.truncated_normal(shape, stddev=0.1)
@@ -414,10 +196,7 @@ sess = tf.InteractiveSession()
    
 x = tf.placeholder(tf.float32, shape=[None, imrows*imcols])
 y_ = tf.placeholder(tf.float32, shape=[None, len(label_lst)]) # len(label_lst)) is the number of unique labels
-box = tf.placeholder(tf.int32, shape=[None, 4])
-name = tf.placeholder(tf.string, shape=[None, 1])
-n = tf.placeholder(tf.int32, shape=[None, 1])
-	
+
 """
 #CONVOLUTION LAYER 1
 """
@@ -463,15 +242,6 @@ y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
 	
 """
 #TRAIN & EVALUATE
-"""
-
-
-"""
-correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-identitybox = tf.identity(box)
-identityname = tf.identity(name)
-identitynum = tf.identity(n)
 """
 
 # Define TensorFlow Session
@@ -575,6 +345,5 @@ if __name__ == '__main__':
             fout.write(eqres[0][2] + '\t' + str(eqres[0][3]) + '\t\n') # project specifies extra tab at end
             for comp in eqres:
                 pred, bbox = comp[0], comp[1]
-                #fout.write(r+'\t\n')
                 fout.write(str(SymPred(label_lst[pred[0]], bbox[1], bbox[0], bbox[3], bbox[2])) + '\n')
                 
